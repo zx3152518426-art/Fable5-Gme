@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>山海吞噬进化：从小鲲到灭世巨兽</title>
+<style>
+  /* ============ 全局布局：9:16 竖屏舞台 ============ */
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; background:#02020a; overflow:hidden; font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+  #stage {
+    position:relative; height:100dvh; width:min(100vw, calc(100dvh * 9 / 16));
+    margin:0 auto; overflow:hidden; background:#04061a;
+    box-shadow:0 0 60px rgba(60,120,255,.15);
+  }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  /* ============ HUD ============ */
+  #hud { position:absolute; top:0; left:0; right:0; padding:10px 12px 0; color:#dfe9ff; pointer-events:none; display:none; z-index:5; text-shadow:0 0 8px rgba(80,160,255,.8); }
+  #hudTop { display:flex; justify-content:space-between; align-items:center; font-size:13px; }
+  #stageName { font-size:17px; font-weight:700; color:#ffe9a8; text-shadow:0 0 12px rgba(255,200,80,.9); letter-spacing:2px; }
+  #expWrap { margin-top:6px; height:9px; background:rgba(255,255,255,.12); border-radius:9px; overflow:hidden; border:1px solid rgba(140,200,255,.35); }
+  #expBar { height:100%; width:0%; border-radius:9px; background:linear-gradient(90deg,#36e0ff,#7d6bff,#ffd24a); box-shadow:0 0 10px #6cf; transition:width .2s; }
+  #hudSub { display:flex; justify-content:space-between; margin-top:5px; font-size:12px; color:#9fc6ff; }
+  #hearts { letter-spacing:2px; font-size:14px; }
+
+  /* ============ 覆盖界面 ============ */
+  .screen {
+    position:absolute; inset:0; z-index:10; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:24px;
+    background:radial-gradient(ellipse at 50% 35%, rgba(20,30,80,.55), rgba(2,2,12,.88) 75%);
+    backdrop-filter:blur(2px); color:#eaf2ff;
+  }
+  .hide { display:none !important; }
+  .eyebrow { font-size:13px; letter-spacing:6px; color:#7fd6ff; margin-bottom:10px; text-shadow:0 0 10px #4af; }
+  h1.title {
+    font-size:clamp(30px,8.5vw,46px); font-weight:900; line-height:1.35; letter-spacing:3px;
+    background:linear-gradient(180deg,#fff8e0,#ffd24a 55%,#ff8a3c);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 18px rgba(255,190,60,.55)); margin-bottom:14px;
+    animation:titleFloat 3s ease-in-out infinite;
+  }
+  @keyframes titleFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  .subtitle { font-size:14px; color:#aaccff; letter-spacing:2px; margin-bottom:26px; }
+  .rules { font-size:14px; line-height:2.1; color:#cfe2ff; margin-bottom:30px; }
+  .rules b { color:#ffd86b; }
+  .rules .bad { color:#ff7a7a; }
+  .btn {
+    pointer-events:auto; cursor:pointer; border:none; outline:none;
+    font-size:19px; font-weight:800; letter-spacing:5px; color:#3a1c00;
+    padding:15px 52px; border-radius:50px;
+    background:linear-gradient(180deg,#ffe9a0,#ffb52e);
+    box-shadow:0 0 25px rgba(255,180,50,.7), inset 0 -3px 0 rgba(150,70,0,.4);
+    animation:btnPulse 1.6s ease-in-out infinite; transition:transform .1s;
+  }
+  .btn:active { transform:scale(.93); }
+  @keyframes btnPulse { 0%,100%{box-shadow:0 0 18px rgba(255,180,50,.6)} 50%{box-shadow:0 0 42px rgba(255,200,80,1)} }
+  .stat { font-size:15px; color:#bcd6ff; line-height:2; margin-bottom:26px; }
+  .stat b { color:#ffd86b; font-size:19px; }
+  #deadTitle { background:linear-gradient(180deg,#ffd2d2,#ff5b5b 60%,#a01020); -webkit-background-clip:text; background-clip:text; animation:none; }
+  #winTitle  { animation:titleFloat 2.4s ease-in-out infinite; }
+  .tip { position:absolute; bottom:22px; font-size:12px; color:#6f8fc9; letter-spacing:2px; }
+  @media (prefers-reduced-motion: reduce){ .btn, h1.title { animation:none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+
+  <!-- 顶部 HUD -->
+  <div id="hud">
+    <div id="hudTop">
+      <div><span id="stageName">幼鲲</span>　<span id="lv">Lv.1</span></div>
+      <div id="hearts">❤❤❤</div>
+    </div>
+    <div id="expWrap"><div id="expBar"></div></div>
+    <div id="hudSub">
+      <span id="expText">灵气 0 / 10</span>
+      <span>已吞噬 <b id="eatCount" style="color:#ffd86b">0</b></span>
+    </div>
+  </div>
+
+  <!-- 开始界面 -->
+  <div id="menu" class="screen">
+    <div class="eyebrow">山 海 异 闻 · 进 化 之 路</div>
+    <h1 class="title">从一只小鲲开始<br>吞噬山海</h1>
+    <div class="subtitle">幼鲲 → 云鲲 → 雷鲲 → 星鲲 → 吞天巨兽</div>
+    <div class="rules">
+      <b>拖动 / 鼠标 / 方向键</b> 控制小鲲游动<br>
+      吞噬比你小的 <b>灵气·小鱼·星辰</b> 不断变大<br>
+      躲开 <span class="bad">红眼上古凶兽</span>，否则会被撕咬<br>
+      最终张口吞下 <b>太阳碎片</b>，成就吞天之名
+    </div>
+    <button id="btnStart" class="btn">开 始 进 化</button>
+    <div class="tip">竖屏体验最佳 · 戴上耳机更炸裂</div>
+  </div>
+
+  <!-- 失败界面 -->
+  <div id="dead" class="screen hide">
+    <div class="eyebrow">进 化 中 断</div>
+    <h1 class="title" id="deadTitle">你被上古凶兽<br>吞噬了</h1>
+    <div class="stat">
+      最终形态：<b id="dStage">幼鲲</b><br>
+      吞噬生灵：<b id="dEat">0</b>　存活：<b id="dTime">0</b> 秒
+    </div>
+    <button id="btnRetry" class="btn">再 次 进 化</button>
+  </div>
+
+  <!-- 胜利界面 -->
+  <div id="win" class="screen hide">
+    <div class="eyebrow">山 海 俱 寂 · 万 物 入 腹</div>
+    <h1 class="title" id="winTitle">你已成为<br>吞天巨兽</h1>
+    <div class="stat">
+      吞噬生灵：<b id="wEat">0</b>　耗时：<b id="wTime">0</b> 秒<br>
+      连太阳也成为了你的食物
+    </div>
+    <button id="btnAgain" class="btn">重 走 进 化 路</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   《山海吞噬进化：从小鲲到灭世巨兽》
+   单文件 Canvas 游戏 · 国风神话 × 赛博粒子
+   ========================================================= */
+
+/* ---------- 工具 ---------- */
+const rand  = (a,b)=>a+Math.random()*(b-a);
+const randi = (a,b)=>Math.floor(rand(a,b+1));
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
+const lerp  = (a,b,t)=>a+(b-a)*t;
+const dist2 = (ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;};
+const TAU = Math.PI*2;
+
+/* ---------- 画布 ---------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W=0, H=0, DPR=1, vignette=null;
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = r.width; H = r.height;
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // 预渲染暗角
+  vignette = document.createElement('canvas');
+  vignette.width = W; vignette.height = H;
+  const vc = vignette.getContext('2d');
+  const g = vc.createRadialGradient(W/2,H/2,Math.min(W,H)*.45, W/2,H/2,Math.max(W,H)*.75);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,20,.55)');
+  vc.fillStyle=g; vc.fillRect(0,0,W,H);
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------- 发光精灵缓存（性能优化：避免逐帧 shadowBlur） ---------- */
+const glowCache = {};
+function glowSprite(color, size=64){
+  const key = color+size;
+  if(glowCache[key]) return glowCache[key];
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  gr.addColorStop(0,color); gr.addColorStop(.35,color.replace(')',',.55)').replace('rgb','rgba'));
+  gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=gr; g.fillRect(0,0,size,size);
+  glowCache[key]=c; return c;
+}
+function drawGlow(x,y,r,color){
+  const s = glowSprite(color);
+  ctx.drawImage(s, x-r, y-r, r*2, r*2);
+}
+
+/* ---------- WebAudio 音效 ---------- */
+let AC=null;
+function audio(){ if(!AC){ AC = new (window.AudioContext||window.webkitAudioContext)(); } if(AC.state==='suspended') AC.resume(); return AC; }
+function tone(freq, dur, type='sine', vol=.2, slide=0, delay=0){
+  const ac=audio(), t=ac.currentTime+delay;
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide), t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+.05);
+}
+function noiseBurst(dur=.25, vol=.25){
+  const ac=audio(), n=ac.sampleRate*dur, buf=ac.createBuffer(1,n,ac.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const s=ac.createBufferSource(); s.buffer=buf;
+  const g=ac.createGain(); g.gain.value=vol;
+  const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900;
+  s.connect(f).connect(g).connect(ac.destination); s.start();
+}
+const sfx = {
+  eat(n){ tone(440+Math.min(n,12)*45, .14, 'sine', .16, 260); tone(660+Math.min(n,12)*45,.1,'triangle',.08,200,.02); },
+  hurt(){ tone(220,.3,'sawtooth',.22,-160); noiseBurst(.22,.3); },
+  combo(){ tone(880,.1,'square',.12,200); tone(1320,.14,'square',.1,300,.08); },
+  evolve(){ tone(180,.9,'sawtooth',.16,700); [523,659,784,1046].forEach((f,i)=>tone(f,.5,'triangle',.14,0,.15+i*.09)); noiseBurst(.5,.2); },
+  storm(){ tone(120,.7,'sawtooth',.2,300); noiseBurst(.6,.25); },
+  win(){ [392,523,659,784,1046,1318].forEach((f,i)=>tone(f,.8,'triangle',.16,0,i*.12)); tone(98,1.6,'sawtooth',.18,80); noiseBurst(.8,.2); }
+};
+
+/* ---------- 进化阶段配置 ---------- */
+const STAGES = [
+  { name:'幼鲲',   r:16, body:'#3ad6ff', glow:'rgb(60,210,255)',  deco:'#bff4ff', need:10,  line:'北冥有鱼，其名为鲲' },
+  { name:'云鲲',   r:24, body:'#5e9bff', glow:'rgb(110,160,255)', deco:'#e0ecff', need:24,  line:'腾云而起，气吞云海' },
+  { name:'雷鲲',   r:34, body:'#9b6bff', glow:'rgb(170,110,255)', deco:'#f0e2ff', need:44,  line:'雷纹缠身，声震九霄' },
+  { name:'星鲲',   r:47, body:'#ffc94a', glow:'rgb(255,205,90)',  deco:'#fff3cf', need:72,  line:'遨游星河，吞噬辰光' },
+  { name:'吞天巨兽',r:64, body:'#ff9a3c', glow:'rgb(255,150,60)', deco:'#ffe9c0', need:5,   line:'张口之间，山海俱灭' } // need=太阳碎片数
+];
+
+/* ---------- 游戏状态 ---------- */
+const G = {
+  state:'menu',          // menu | count | play | evolve | dying | victory | dead | win
+  t:0, playT:0,
+  timeScale:1, tsTarget:1,
+  shake:0, flash:{a:0,color:'255,255,255'},
+  countNum:3, countT:0,
+  stormDone:false, openDone:false,
+  zoom:1, zoomTarget:1,
+  evoT:0, dieT:0, winT:0, winPhase:0,
+};
+const P = { x:0,y:0, tx:0,ty:0, r:16, stage:0, exp:0, hp:3, inv:0, ang:0, eat:0, combo:0, comboT:0, trail:[], sun:0 };
+
+let foods=[], beasts=[], parts=[], shocks=[], texts=[], bolts=[], suckStars=false;
+let stars=[], clouds=[], mountains=[], runeRot=0;
+const keys={};
+
+/* ---------- DOM ---------- */
+const $ = id=>document.getElementById(id);
+const ui = { hud:$('hud'), menu:$('menu'), dead:$('dead'), win:$('win'),
+  stageName:$('stageName'), lv:$('lv'), hearts:$('hearts'), expBar:$('expBar'),
+  expText:$('expText'), eatCount:$('eatCount') };
+
+/* ---------- 背景生成 ---------- */
+function makeCloudSprite(){
+  const c=document.createElement('canvas'); c.width=260; c.height=130;
+  const g=c.getContext('2d');
+  for(let i=0;i<7;i++){
+    const x=rand(40,220), y=rand(45,95), r=rand(25,55);
+    const gr=g.createRadialGradient(x,y,0,x,y,r);
+    gr.addColorStop(0,'rgba(190,215,255,.5)'); gr.addColorStop(1,'rgba(190,215,255,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,r,0,TAU); g.fill();
+  }
+  return c;
+}
+function makeRuneSprite(){
+  const s=520, c=document.createElement('canvas'); c.width=c.height=s;
+  const g=c.getContext('2d'); g.translate(s/2,s/2);
+  g.strokeStyle='rgba(120,190,255,.5)'; g.lineWidth=2;
+  g.beginPath(); g.arc(0,0,240,0,TAU); g.stroke();
+  g.beginPath(); g.arc(0,0,205,0,TAU); g.stroke();
+  for(let i=0;i<36;i++){ // 符文刻痕
+    const a=i/36*TAU; g.save(); g.rotate(a);
+    g.beginPath(); g.moveTo(205,0); g.lineTo(240,0); g.stroke();
+    if(i%3===0){ // 小篆式符号
+      g.translate(222,0); g.rotate(Math.PI/2);
+      g.beginPath();
+      g.moveTo(-7,-7); g.lineTo(7,-7); g.moveTo(0,-7); g.lineTo(0,7); g.moveTo(-5,2); g.lineTo(5,5);
+      g.stroke();
+    }
+    g.restore();
+  }
+  g.beginPath(); g.arc(0,0,150,0,TAU); g.setLineDash([6,12]); g.stroke();
+  return c;
+}
+let cloudSprite=null, runeSprite=null;
+function initBG(){
+  cloudSprite = makeCloudSprite(); runeSprite = makeRuneSprite();
+  stars=[]; for(let i=0;i<90;i++) stars.push({x:rand(0,W),y:rand(0,H),r:rand(.5,1.8),tw:rand(0,TAU),sp:rand(.4,1)});
+  clouds=[]; for(let i=0;i<9;i++) clouds.push({x:rand(-100,W),y:rand(0,H),s:rand(.7,1.9),v:rand(6,20),front:i>5,a:rand(.25,.5)});
+  mountains=[];
+  for(let l=0;l<2;l++){ // 远古山影：两层折线轮廓
+    const pts=[], n=9, base=H*(.62+l*.14);
+    for(let i=0;i<=n;i++) pts.push({x:i/n*W, y:base-rand(20,90)*(l?1.4:1)});
+    mountains.push({pts, base, col:l? 'rgba(20,28,70,.85)':'rgba(30,42,100,.6)'});
+  }
+}
+
+/* ---------- 特效 ---------- */
+function burst(x,y,color,n=14,sp=180,life=.7,r=3){
+  if(parts.length>420) return;
+  for(let i=0;i<n;i++){
+    const a=rand(0,TAU), v=rand(sp*.3,sp);
+    parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(life*.5,life),t:0,r:rand(r*.5,r),color,suck:false});
+  }
+}
+function shock(x,y,color='255,220,120',maxR=160,w=6){ shocks.push({x,y,r:8,maxR,w,a:1,color}); }
+function fText(str,x,y,size=22,color='#ffe9a8',life=1){ texts.push({str,x,y,size,color,t:0,life,vy:-40}); }
+function flash(color='255,255,255',a=.7){ G.flash.color=color; G.flash.a=Math.max(G.flash.a,a); }
+function lightning(x1,y1,x2,y2){
+  const pts=[{x:x1,y:y1}]; const seg=7;
+  for(let i=1;i<seg;i++){ const t=i/seg; pts.push({x:lerp(x1,x2,t)+rand(-34,34), y:lerp(y1,y2,t)+rand(-18,18)}); }
+  pts.push({x:x2,y:y2});
+  bolts.push({pts,t:0,life:.3});
+}
+
+/* ---------- 生成食物 / 凶兽 ---------- */
+const FOOD_DEFS = {
+  orb:   { exp:1, stage:0 }, fish: { exp:2, stage:0 },
+  shadow:{ exp:3, stage:1 }, star: { exp:4, stage:2 },
+  sun:   { exp:0, stage:4 },
+};
+function spawnFood(type){
+  const st = P.stage;
+  if(!type){
+    const pool=Object.keys(FOOD_DEFS).filter(k=>FOOD_DEFS[k].stage<=st && (k!=='sun'||st>=4));
+    type = pool[randi(0,pool.length-1)];
+  }
+  const def = FOOD_DEFS[type];
+  const base = STAGES[st].r;
+  const r = type==='sun' ? base*.55 : clamp(base*rand(.22,.55), 5, base*.7);
+  let x,y,tries=0;
+  do { x=rand(40,W-40); y=rand(80,H-50); tries++; }
+  while(tries<10 && dist2(x,y,P.x,P.y) < (P.r+120)**2);
+  foods.push({type,x,y,r,exp:def.exp,bob:rand(0,TAU),vx:rand(-14,14),vy:rand(-10,10),rot:rand(0,TAU),abs:false});
+}
+function spawnBeast(force=false){
+  const cap = 3+P.stage;
+  if(!force && beasts.length>=cap) return;
+  const big = Math.random()<.7;
+  const r = big ? P.r*rand(1.25,1.8) : P.r*rand(.5,.8); // 小部分可被反吞
+  const side = randi(0,3);
+  let x,y;
+  if(side===0){x=-r*2;y=rand(0,H);} else if(side===1){x=W+r*2;y=rand(0,H);}
+  else if(side===2){x=rand(0,W);y=-r*2;} else {x=rand(0,W);y=H+r*2;}
+  const sp = rand(40,75)*(big?1:1.4);
+  beasts.push({x,y,r,sp,vx:0,vy:0,t:rand(0,TAU)});
+}
+
+/* ---------- 重置 ---------- */
+function reset(){
+  foods=[]; beasts=[]; parts=[]; shocks=[]; texts=[]; bolts=[];
+  Object.assign(P,{x:W/2,y:H*.6,tx:W/2,ty:H*.6,r:STAGES[0].r,stage:0,exp:0,hp:3,inv:0,ang:-Math.PI/2,eat:0,combo:0,comboT:0,trail:[],sun:0});
+  Object.assign(G,{t:0,playT:0,timeScale:1,tsTarget:1,shake:0,countNum:3,countT:0,stormDone:false,openDone:false,zoom:1,zoomTarget:1,evoT:0,dieT:0,winT:0,winPhase:0});
+  G.flash.a=0; suckStars=false; runeRot=0;
+  for(let i=0;i<12;i++) spawnFood();
+  initBG(); updateHUD();
+}
+
+/* ---------- HUD ---------- */
+function updateHUD(){
+  const st=STAGES[P.stage];
+  ui.stageName.textContent=st.name;
+  ui.lv.textContent='Lv.'+(P.stage+1);
+  ui.hearts.textContent='❤'.repeat(P.hp)+'♡'.repeat(Math.max(0,3-P.hp));
+  if(P.stage>=4){
+    ui.expBar.style.width=(P.sun/st.need*100)+'%';
+    ui.expText.textContent='太阳碎片 '+P.sun+' / '+st.need;
+  }else{
+    ui.expBar.style.width=(P.exp/st.need*100)+'%';
+    ui.expText.textContent='灵气 '+P.exp+' / '+st.need;
+  }
+  ui.eatCount.textContent=P.eat;
+}
+
+/* ---------- 输入：触摸 / 鼠标 / 键盘 ---------- */
+let dragging=false;
+function pointerPos(e){
+  const r=cv.getBoundingClientRect();
+  return { x:(e.clientX-r.left), y:(e.clientY-r.top) };
+}
+cv.addEventListener('pointerdown',e=>{ dragging=true; const p=pointerPos(e); P.tx=p.x; P.ty=p.y; });
+cv.addEventListener('pointermove',e=>{ if(dragging){ const p=pointerPos(e); P.tx=p.x; P.ty=p.y; } });
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('keydown',e=>{ keys[e.key]=true; if(e.key.startsWith('Arrow')) e.preventDefault(); });
+window.addEventListener('keyup',e=>keys[e.key]=false);
+
+/* ---------- 吞噬 ---------- */
+function eatFood(f){
+  P.eat++; P.combo++; P.comboT=2;
+  if(f.type==='sun'){
+    P.sun++; sfx.eat(P.combo); flash('255,220,150',.45);
+    shock(f.x,f.y,'255,180,60',220,8); burst(f.x,f.y,'rgb(255,190,80)',26,260,1,4);
+    fText('吞噬太阳碎片！',P.x,P.y-P.r-26,26,'#ffce5e',1.2);
+    G.shake=Math.max(G.shake,10);
+    if(P.sun>=STAGES[4].need){ startVictory(); return; }
+  }else{
+    P.exp+=f.exp; sfx.eat(P.combo);
+    const cols={orb:'rgb(80,220,255)',fish:'rgb(90,255,200)',shadow:'rgb(190,120,255)',star:'rgb(255,215,110)'};
+    burst(f.x,f.y,cols[f.type]||'rgb(120,220,255)',10,150,.6,2.6);
+    fText('+'+f.exp,f.x,f.y-14,17,'#9fe8ff',.7);
+    G.shake=Math.max(G.shake,2);
+  }
+  if(P.eat%10===0){ // 连吞爆点
+    sfx.combo(); G.shake=Math.max(G.shake,9);
+    fText('连吞 ×'+P.eat,W/2,H*.34,40,'#ffd24a',1.3);
+    shock(P.x,P.y,'120,220,255',180,5);
+  }
+  if(P.stage<4 && P.exp>=STAGES[P.stage].need) startEvolve();
+  updateHUD();
+}
+function hitPlayer(b){
+  if(P.inv>0) return;
+  P.hp--; P.inv=1.6; sfx.hurt();
+  flash('255,60,60',.5); G.shake=14; G.tsTarget=.3; setTimeout(()=>{ if(G.state==='play') G.tsTarget=1; },260);
+  burst(P.x,P.y,'rgb(255,90,90)',20,220,.8,3.5);
+  fText('被凶兽撕咬！',P.x,P.y-P.r-24,24,'#ff8080',1);
+  const a=Math.atan2(P.y-b.y,P.x-b.x); P.x+=Math.cos(a)*60; P.y+=Math.sin(a)*60;
+  updateHUD();
+  if(P.hp<=0) startDeath();
+}
+
+/* ---------- 进化 ---------- */
+function startEvolve(){
+  G.state='evolve'; G.evoT=0; G.tsTarget=.12;
+  sfx.evolve(); flash('255,225,140',.85);
+  shock(P.x,P.y,'255,215,110',Math.max(W,H),10);
+  shock(P.x,P.y,'255,240,200',Math.max(W,H)*.7,14);
+  for(let i=0;i<3;i++) lightning(rand(0,W),-20,P.x+rand(-40,40),P.y+rand(-30,30));
+  burst(P.x,P.y,'rgb(255,220,120)',40,320,1.2,4);
+  // 进化冲击波净化凶兽
+  beasts.forEach(b=>{ burst(b.x,b.y,'rgb(255,160,80)',12,200,.8,3); });
+  beasts=[];
+}
+function finishEvolve(){
+  P.stage++; P.exp=0;
+  const st=STAGES[P.stage];
+  fText(st.line,W/2,H*.3,20,'#ffe9b8',2);
+  G.state='play'; G.tsTarget=1;
+  if(P.stage>=4){ // 吞天巨兽：画面缩放 + 星辰被吸入
+    G.zoomTarget=.78; suckStars=true;
+    fText('星辰开始坠向你的口中…',W/2,H*.42,18,'#ffd86b',2.4);
+    spawnFood('sun'); spawnFood('sun');
+  }
+  updateHUD();
+}
+
+/* ---------- 死亡 / 胜利 ---------- */
+function startDeath(){
+  G.state='dying'; G.dieT=0; G.tsTarget=.15;
+  burst(P.x,P.y,'rgb(120,200,255)',50,280,1.4,4);
+  burst(P.x,P.y,'rgb(255,80,80)',30,200,1.2,3);
+  flash('200,30,30',.6);
+}
+function startVictory(){
+  G.state='victory'; G.winT=0; G.winPhase=0; G.tsTarget=.22;
+  sfx.win(); suckStars=true;
+  shock(P.x,P.y,'255,230,160',Math.max(W,H),12);
+  G.shake=16;
+}
+
+/* ---------- 主更新 ---------- */
+function update(dt){
+  const sdt = dt*G.timeScale; // 慢动作时间
+  G.timeScale = lerp(G.timeScale,G.tsTarget,dt*5);
+  G.zoom = lerp(G.zoom,G.zoomTarget,dt*1.5);
+  G.shake = Math.max(0,G.shake-dt*30);
+  G.flash.a = Math.max(0,G.flash.a-dt*1.6);
+  runeRot += sdt*.12;
+
+  // 背景
+  for(const c of clouds){ c.x+=c.v*sdt*(c.front?1.6:1); if(c.x>W+150){c.x=-260*c.s;c.y=rand(0,H);} }
+  for(const s of stars){
+    s.tw+=dt*3;
+    if(suckStars){ // 星河倒流被吸入
+      const a=Math.atan2(P.y-s.y,P.x-s.x);
+      s.x+=Math.cos(a)*120*sdt*s.sp; s.y+=Math.sin(a)*120*sdt*s.sp;
+      if(dist2(s.x,s.y,P.x,P.y)<(P.r*.8)**2){ s.x=rand(0,W); s.y=Math.random()<.5?rand(-40,0):rand(0,H); burst(P.x,P.y,'rgb(255,230,150)',2,80,.4,2); }
+    }
+  }
+
+  // 特效
+  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.t+=dt;
+    p.x+=p.vx*sdt; p.y+=p.vy*sdt; p.vx*=.97; p.vy*=.97;
+    if(p.t>p.life) parts.splice(i,1); }
+  for(let i=shocks.length-1;i>=0;i--){ const s=shocks[i];
+    s.r+=Math.max(300,(s.maxR-s.r)*6)*dt; s.a-=dt*1.6;
+    if(s.a<=0||s.r>=s.maxR) shocks.splice(i,1); }
+  for(let i=texts.length-1;i>=0;i--){ const t=texts[i]; t.t+=dt; t.y+=t.vy*dt; if(t.t>t.life) texts.splice(i,1); }
+  for(let i=bolts.length-1;i>=0;i--){ bolts[i].t+=dt; if(bolts[i].t>bolts[i].life) bolts.splice(i,1); }
+
+  /* ----- 状态机 ----- */
+  if(G.state==='count'){
+    G.countT+=dt;
+    if(G.countT>=1){ G.countT=0; G.countNum--;
+      if(G.countNum<=0){ G.state='play'; openingHook(); } else tone(520,.15,'sine',.15); }
+    return;
+  }
+  if(G.state==='evolve'){
+    G.evoT+=dt;
+    const st=STAGES[Math.min(P.stage+1,4)];
+    P.r = lerp(P.r, st.r, dt*3);
+    if(Math.random()<.2) lightning(rand(0,W),-10,P.x+rand(-60,60),P.y+rand(-40,40));
+    if(Math.random()<.3) burst(P.x+rand(-P.r,P.r),P.y+rand(-P.r,P.r),'rgb(255,225,130)',3,120,.6,3);
+    if(G.evoT>1.9) finishEvolve();
+    return;
+  }
+  if(G.state==='dying'){
+    G.dieT+=dt;
+    if(G.dieT>1.4){ G.state='dead'; showDead(); }
+    return;
+  }
+  if(G.state==='victory'){
+    G.winT+=dt;
+    if(Math.random()<.5) burst(rand(0,W),rand(0,H),'rgb(255,230,150)',3,100,.6,2.5);
+    if(G.winPhase===0 && G.winT>1.1){ G.winPhase=1; flash('255,255,255',1); G.shake=20; }
+    if(G.winPhase===1){ G.flash.a=Math.max(G.flash.a, clamp((G.winT-1.1)*1.4,0,1)); }
+    if(G.winT>3.0){ G.state='win'; showWin(); }
+    return;
+  }
+  if(G.state!=='play') return;
+
+  /* ----- 游玩中 ----- */
+  G.playT+=dt;
+  // 15 秒内的大爆点：灵气风暴
+  if(!G.stormDone && G.playT>11){
+    G.stormDone=true; sfx.storm();
+    G.tsTarget=.3; setTimeout(()=>{ if(G.state==='play') G.tsTarget=1; },700);
+    flash('120,200,255',.4); G.shake=10;
+    fText('灵气风暴来袭！',W/2,H*.32,34,'#7fd6ff',1.6);
+    shock(W/2,H/2,'120,200,255',Math.max(W,H),8);
+    for(let i=0;i<22;i++){ const a=i/22*TAU; const d=rand(120,Math.min(W,H)/2);
+      const f={type: Math.random()<.5?'orb':'star', x:W/2+Math.cos(a)*d, y:H/2+Math.sin(a)*d,
+        r:clamp(STAGES[P.stage].r*rand(.25,.5),5,40), exp:Math.random()<.5?1:4,
+        bob:rand(0,TAU),vx:0,vy:0,rot:rand(0,TAU),abs:false};
+      foods.push(f); }
+  }
+
+  // 键盘控制
+  let kx=0,ky=0;
+  if(keys.ArrowLeft||keys.a||keys.A)kx--; if(keys.ArrowRight||keys.d||keys.D)kx++;
+  if(keys.ArrowUp||keys.w||keys.W)ky--; if(keys.ArrowDown||keys.s||keys.S)ky++;
+  if(kx||ky){ const l=Math.hypot(kx,ky); P.tx=P.x+kx/l*140; P.ty=P.y+ky/l*140; }
+
+  // 玩家平滑跟随
+  const follow = 4.2;
+  const px=P.x, py=P.y;
+  P.x = lerp(P.x,P.tx,clamp(dt*follow,0,1)*G.timeScale);
+  P.y = lerp(P.y,P.ty,clamp(dt*follow,0,1)*G.timeScale);
+  P.x = clamp(P.x,P.r,W-P.r); P.y = clamp(P.y,P.r+50,H-P.r);
+  const mvx=P.x-px, mvy=P.y-py;
+  if(Math.hypot(mvx,mvy)>.6) P.ang = lerp(P.ang, Math.atan2(mvy,mvx), .18);
+  P.inv=Math.max(0,P.inv-dt);
+  P.comboT-=dt; if(P.comboT<=0) P.combo=0;
+  // 拖尾
+  P.trail.unshift({x:P.x,y:P.y}); if(P.trail.length>16) P.trail.pop();
+
+  // 食物
+  for(let i=foods.length-1;i>=0;i--){
+    const f=foods[i]; f.bob+=sdt*2; f.rot+=sdt;
+    f.x+=f.vx*sdt; f.y+=f.vy*sdt;
+    if(f.x<20||f.x>W-20)f.vx*=-1; if(f.y<70||f.y>H-20)f.vy*=-1;
+    const d2=dist2(f.x,f.y,P.x,P.y), rr=(P.r+f.r);
+    if(!f.abs && d2<(rr+P.r*.6)**2 && f.r<P.r*.92) f.abs=true; // 进入旋涡吸收
+    if(f.abs){
+      const a=Math.atan2(P.y-f.y,P.x-f.x);
+      f.x+=Math.cos(a)*420*sdt; f.y+=Math.sin(a)*420*sdt; f.r*=1-3*sdt;
+      if(dist2(f.x,f.y,P.x,P.y)<(P.r*.5)**2 || f.r<2){ foods.splice(i,1); eatFood(f); }
+    }
+  }
+  const targetFood = 12+P.stage*2;
+  if(foods.length<targetFood && Math.random()<dt*4) spawnFood();
+  if(P.stage>=4 && foods.filter(f=>f.type==='sun').length<2 && Math.random()<dt*.8) spawnFood('sun');
+
+  // 凶兽
+  if(Math.random()<dt*(0.45+P.stage*.12)) spawnBeast();
+  for(let i=beasts.length-1;i>=0;i--){
+    const b=beasts[i]; b.t+=sdt;
+    const hunt = b.r>P.r; // 大凶兽追玩家，小的逃
+    const a=Math.atan2(P.y-b.y,P.x-b.x)+(hunt?0:Math.PI)+Math.sin(b.t*1.7)*.4;
+    b.vx=lerp(b.vx,Math.cos(a)*b.sp,dt*2); b.vy=lerp(b.vy,Math.sin(a)*b.sp,dt*2);
+    b.x+=b.vx*sdt; b.y+=b.vy*sdt;
+    if(b.x<-300||b.x>W+300||b.y<-300||b.y>H+300){ beasts.splice(i,1); continue; }
+    const d2=dist2(b.x,b.y,P.x,P.y);
+    if(d2<(P.r+b.r)*(P.r+b.r)*.6){
+      if(P.r>b.r*1.08){ // 反吞凶兽！
+        beasts.splice(i,1); P.exp+=6; P.eat++; P.combo++; P.comboT=2;
+        sfx.eat(P.combo); G.shake=Math.max(G.shake,7);
+        burst(b.x,b.y,'rgb(255,80,80)',20,240,.9,4);
+        shock(b.x,b.y,'255,90,90',140,5);
+        fText('反吞凶兽 +6',b.x,b.y-20,22,'#ff9a6a',1);
+        if(P.eat%10===0){ sfx.combo(); fText('连吞 ×'+P.eat,W/2,H*.34,40,'#ffd24a',1.3); }
+        if(P.stage<4 && P.exp>=STAGES[P.stage].need) startEvolve();
+        updateHUD();
+      } else hitPlayer(b);
+    }
+  }
+}
+
+/* ---------- 开局 3 秒钩子：环形灵气连吞 ---------- */
+function openingHook(){
+  flash('150,220,255',.5); G.shake=8;
+  shock(P.x,P.y,'120,220,255',260,7);
+  fText('吞噬开始！',W/2,H*.32,36,'#aef',1.2);
+  for(let i=0;i<6;i++){ const a=i/6*TAU;
+    foods.push({type:'orb',x:P.x+Math.cos(a)*70,y:P.y+Math.sin(a)*70,r:8,exp:1,bob:rand(0,TAU),vx:0,vy:0,rot:0,abs:true});
+  }
+  tone(300,.4,'sine',.18,400);
+}
+
+/* ---------- 绘制 ---------- */
+function drawBG(){
+  // 天幕：随阶段变色
+  const hues=[[8,12,40],[10,18,55],[20,10,55],[28,18,45],[35,12,30]];
+  const c=hues[P.stage];
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,`rgb(${c[0]},${c[1]},${c[2]+25})`);
+  g.addColorStop(.55,`rgb(${c[0]+6},${c[1]+8},${c[2]+45})`);
+  g.addColorStop(1,`rgb(${c[0]},${c[1]},${c[2]})`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // 星河
+  for(const s of stars){
+    const a=.4+.6*Math.abs(Math.sin(s.tw));
+    ctx.globalAlpha=a; ctx.fillStyle='#cfe4ff';
+    ctx.fillRect(s.x,s.y,s.r,s.r);
+  }
+  ctx.globalAlpha=1;
+  // 符文阵法
+  ctx.save(); ctx.globalAlpha=.28; ctx.translate(W/2,H*.5); ctx.rotate(runeRot);
+  ctx.drawImage(runeSprite,-W*.62,-W*.62,W*1.24,W*1.24); ctx.restore();
+  // 远古山影
+  for(const m of mountains){
+    ctx.fillStyle=m.col; ctx.beginPath(); ctx.moveTo(0,H);
+    for(const p of m.pts) ctx.lineTo(p.x,p.y);
+    ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+  }
+  // 背层云
+  for(const c2 of clouds) if(!c2.front){
+    ctx.globalAlpha=c2.a; ctx.drawImage(cloudSprite,c2.x,c2.y,260*c2.s,130*c2.s);
+  }
+  ctx.globalAlpha=1;
+}
+function drawFood(f){
+  const tBob=Math.sin(f.bob)*4;
+  const x=f.x, y=f.y+tBob;
+  if(f.type==='orb'){
+    drawGlow(x,y,f.r*3,'rgb(70,210,255)');
+    ctx.fillStyle='#bff2ff'; ctx.beginPath(); ctx.arc(x,y,f.r*.65,0,TAU); ctx.fill();
+  }else if(f.type==='fish'){
+    drawGlow(x,y,f.r*2.4,'rgb(90,255,210)');
+    ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(f.bob)*.4);
+    ctx.fillStyle='#8dffd9';
+    ctx.beginPath(); ctx.ellipse(0,0,f.r,f.r*.5,0,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-f.r,0); ctx.lineTo(-f.r*1.6,-f.r*.5); ctx.lineTo(-f.r*1.6,f.r*.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }else if(f.type==='shadow'){
+    drawGlow(x,y,f.r*2.6,'rgb(180,110,255)');
+    ctx.fillStyle='rgba(60,20,110,.9)';
+    ctx.beginPath(); ctx.ellipse(x,y,f.r,f.r*.8,Math.sin(f.rot)*.3,0,TAU); ctx.fill();
+    ctx.fillStyle='#e9c8ff';
+    ctx.beginPath(); ctx.arc(x-f.r*.3,y-f.r*.15,1.8,0,TAU); ctx.arc(x+f.r*.3,y-f.r*.15,1.8,0,TAU); ctx.fill();
+  }else if(f.type==='star'){
+    drawGlow(x,y,f.r*3,'rgb(255,215,110)');
+    ctx.save(); ctx.translate(x,y); ctx.rotate(f.rot);
+    ctx.fillStyle='#ffe9a0'; ctx.beginPath();
+    for(let i=0;i<4;i++){ const a=i/4*TAU;
+      ctx.lineTo(Math.cos(a)*f.r,Math.sin(a)*f.r);
+      ctx.lineTo(Math.cos(a+TAU/8)*f.r*.4,Math.sin(a+TAU/8)*f.r*.4); }
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }else if(f.type==='sun'){
+    const fl=1+Math.sin(f.bob*3)*.08;
+    drawGlow(x,y,f.r*4*fl,'rgb(255,150,50)');
+    drawGlow(x,y,f.r*2.2,'rgb(255,220,140)');
+    ctx.fillStyle='#fff3d0'; ctx.beginPath(); ctx.arc(x,y,f.r*.7*fl,0,TAU); ctx.fill();
+    ctx.strokeStyle='rgba(255,180,80,.8)'; ctx.lineWidth=2;
+    for(let i=0;i<8;i++){ const a=f.rot+i/8*TAU;
+      ctx.beginPath(); ctx.moveTo(x+Math.cos(a)*f.r*.85,y+Math.sin(a)*f.r*.85);
+      ctx.lineTo(x+Math.cos(a)*f.r*1.25*fl,y+Math.sin(a)*f.r*1.25*fl); ctx.stroke(); }
+  }
+}
+function drawBeast(b){
+  ctx.save(); ctx.translate(b.x,b.y);
+  const ang=Math.atan2(b.vy,b.vx); ctx.rotate(ang);
+  const r=b.r;
+  drawGlow(0,0,r*1.8,'rgb(255,40,40)');
+  // 红黑剪影躯体
+  ctx.fillStyle='rgba(12,2,8,.96)';
+  ctx.beginPath();
+  ctx.moveTo(r*1.1,0);
+  ctx.bezierCurveTo(r*.5,-r*.8,-r*.4,-r*.75,-r,-r*.15);
+  ctx.lineTo(-r*1.5,-r*.6); ctx.lineTo(-r*1.05,0); ctx.lineTo(-r*1.5,r*.6); ctx.lineTo(-r,r*.15);
+  ctx.bezierCurveTo(-r*.4,r*.75,r*.5,r*.8,r*1.1,0);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,50,50,.55)'; ctx.lineWidth=2; ctx.stroke();
+  // 背鳍尖刺
+  ctx.fillStyle='rgba(12,2,8,.96)';
+  ctx.beginPath(); ctx.moveTo(0,-r*.6); ctx.lineTo(-r*.2,-r*1.2); ctx.lineTo(-r*.5,-r*.55); ctx.closePath(); ctx.fill();
+  // 发光红眼
+  const e=1+Math.sin(b.t*6)*.25;
+  drawGlow(r*.55,-r*.18,r*.5*e,'rgb(255,30,30)');
+  ctx.fillStyle='#ff4030'; ctx.beginPath(); ctx.arc(r*.55,-r*.18,r*.12,0,TAU); ctx.fill();
+  // 利齿
+  ctx.strokeStyle='rgba(255,80,80,.7)'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  for(let i=0;i<4;i++){ const tx=r*(.95-i*.14);
+    ctx.moveTo(tx,r*.05); ctx.lineTo(tx-r*.06,r*.2); }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawKun(){
+  const st=STAGES[P.stage], r=P.r, t=G.t;
+  // 拖尾
+  for(let i=P.trail.length-1;i>0;i--){
+    const tr=P.trail[i], a=(1-i/P.trail.length)*.25;
+    ctx.globalAlpha=a;
+    drawGlow(tr.x,tr.y,r*(1-i/P.trail.length*.5),st.glow);
+  }
+  ctx.globalAlpha=1;
+  ctx.save(); ctx.translate(P.x,P.y);
+  if(P.inv>0 && Math.floor(P.inv*12)%2===0) ctx.globalAlpha=.45; // 受击闪烁
+  ctx.rotate(P.ang);
+  const wag=Math.sin(t*7)*r*.18;
+  // 体外光晕
+  drawGlow(0,0,r*2.4,st.glow);
+  // 躯体
+  ctx.fillStyle=st.body;
+  ctx.beginPath();
+  ctx.moveTo(r*1.15,0);
+  ctx.bezierCurveTo(r*.7,-r*.78,-r*.55,-r*.72,-r*.95,-r*.1+wag*.3);
+  ctx.lineTo(-r*.95,r*.1+wag*.3);
+  ctx.bezierCurveTo(-r*.55,r*.72,r*.7,r*.78,r*1.15,0);
+  ctx.closePath(); ctx.fill();
+  // 腹部渐变
+  const bg=ctx.createLinearGradient(0,-r,0,r);
+  bg.addColorStop(0,'rgba(255,255,255,0)'); bg.addColorStop(1,'rgba(255,255,255,.3)');
+  ctx.fillStyle=bg; ctx.fill();
+  // 尾鳍（摆动）
+  ctx.fillStyle=st.body;
+  ctx.beginPath();
+  ctx.moveTo(-r*.9,wag*.3);
+  ctx.lineTo(-r*1.55,-r*.55+wag);
+  ctx.quadraticCurveTo(-r*1.25,wag*.3,-r*1.55,r*.55+wag);
+  ctx.closePath(); ctx.fill();
+  // 背鳍 + 胸鳍
+  ctx.beginPath(); ctx.moveTo(r*.1,-r*.6); ctx.quadraticCurveTo(-r*.15,-r*1.05,-r*.45,-r*.55); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(r*.25,r*.45); ctx.quadraticCurveTo(r*.05,r*.95,-r*.3,r*.5); ctx.closePath(); ctx.fill();
+  // 吞天巨兽：额外双角
+  if(P.stage>=4){
+    ctx.strokeStyle='#ffdf9a'; ctx.lineWidth=r*.1; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(r*.7,-r*.35); ctx.quadraticCurveTo(r*1.05,-r*.85,r*.75,-r*1.1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r*.7,r*.35); ctx.quadraticCurveTo(r*1.05,r*.85,r*.75,r*1.1); ctx.stroke();
+  }
+  // 发光纹路
+  ctx.strokeStyle=st.deco; ctx.lineWidth=Math.max(1.5,r*.05); ctx.lineCap='round';
+  ctx.globalAlpha=.85;
+  ctx.beginPath(); ctx.moveTo(r*.8,-r*.18); ctx.quadraticCurveTo(0,-r*.55,-r*.7,-r*.2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r*.7,r*.22); ctx.quadraticCurveTo(0,r*.55,-r*.6,r*.22); ctx.stroke();
+  // 雷鲲专属：电纹
+  if(P.stage===2 && Math.random()<.3){
+    ctx.strokeStyle='#e8d0ff'; ctx.lineWidth=1.5;
+    ctx.beginPath(); let lx=r*.6,ly=0;
+    ctx.moveTo(lx,ly);
+    for(let i=0;i<4;i++){ lx-=r*.3; ly=rand(-r*.3,r*.3); ctx.lineTo(lx,ly); }
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  // 鳞片光点
+  const fl=Math.sin(t*4);
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  for(let i=0;i<5;i++){
+    const a=.3+.7*Math.abs(Math.sin(t*3+i*1.7));
+    ctx.globalAlpha=a*.8;
+    ctx.beginPath(); ctx.arc(r*.5-i*r*.28, Math.sin(i*2.1+fl)*r*.3, Math.max(1.2,r*.045),0,TAU); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // 眼睛
+  ctx.fillStyle='#06122a'; ctx.beginPath(); ctx.arc(r*.62,-r*.16,Math.max(2.5,r*.11),0,TAU); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(r*.66,-r*.2,Math.max(1,r*.04),0,TAU); ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha=1;
+}
+function drawFX(){
+  // 粒子
+  for(const p of parts){
+    const a=1-p.t/p.life;
+    ctx.globalAlpha=a;
+    drawGlow(p.x,p.y,p.r*3,p.color);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*.5,0,TAU); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // 冲击波
+  for(const s of shocks){
+    ctx.strokeStyle=`rgba(${s.color},${s.a})`;
+    ctx.lineWidth=s.w*(s.a+.3);
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.stroke();
+  }
+  // 闪电
+  for(const b of bolts){
+    const a=1-b.t/b.life;
+    ctx.strokeStyle=`rgba(220,230,255,${a})`; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(b.pts[0].x,b.pts[0].y);
+    for(const p of b.pts) ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    ctx.strokeStyle=`rgba(160,140,255,${a*.5})`; ctx.lineWidth=8; ctx.stroke();
+  }
+}
+function drawTexts(){
+  for(const t of texts){
+    const k=t.t/t.life, a=k<.15?k/.15:1-(k-.15)/.85;
+    const sc=k<.2?lerp(1.6,1,k/.2):1;
+    ctx.save(); ctx.translate(t.x,t.y); ctx.scale(sc,sc);
+    ctx.globalAlpha=clamp(a,0,1);
+    ctx.font='900 '+t.size+'px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor=t.color; ctx.shadowBlur=16;
+    ctx.fillStyle=t.color; ctx.fillText(t.str,0,0);
+    ctx.shadowBlur=0; ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+function drawBigCenter(str,sub,prog){
+  // 进化/胜利的大标题（带金环）
+  const cx=W/2, cy=H*.42;
+  const ringR=lerp(40,Math.max(W,H)*.7,prog);
+  ctx.strokeStyle=`rgba(255,215,110,${1-prog})`; ctx.lineWidth=10*(1-prog)+2;
+  ctx.beginPath(); ctx.arc(cx,cy,ringR,0,TAU); ctx.stroke();
+  ctx.strokeStyle=`rgba(255,240,200,${(1-prog)*.7})`;
+  ctx.beginPath(); ctx.arc(cx,cy,ringR*.7,0,TAU); ctx.stroke();
+  const pop=prog<.25?lerp(.3,1.15,prog/.25):lerp(1.15,1,clamp((prog-.25)/.2,0,1));
+  ctx.save(); ctx.translate(cx,cy); ctx.scale(pop,pop);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='900 52px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.shadowColor='#ffce5e'; ctx.shadowBlur=30;
+  ctx.fillStyle='#fff3cf'; ctx.fillText(str,0,0);
+  ctx.font='600 19px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.shadowBlur=12; ctx.fillStyle='#ffd86b'; ctx.fillText(sub,0,52);
+  ctx.shadowBlur=0; ctx.restore();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  // 世界层：缩放（吞天巨兽阶段） + 屏幕震动
+  ctx.save();
+  const sh=G.shake;
+  ctx.translate(W/2+rand(-sh,sh), H/2+rand(-sh,sh));
+  ctx.scale(G.zoom,G.zoom);
+  ctx.translate(-W/2,-H/2);
+  for(const f of foods) drawFood(f);
+  for(const b of beasts) drawBeast(b);
+  if(G.state!=='dead' && !(G.state==='dying'&&G.dieT>.6)) drawKun();
+  drawFX();
+  ctx.restore();
+  // 前层云
+  for(const c2 of clouds) if(c2.front){
+    ctx.globalAlpha=c2.a*.8; ctx.drawImage(cloudSprite,c2.x,c2.y,260*c2.s,130*c2.s);
+  }
+  ctx.globalAlpha=1;
+  drawTexts();
+  // 进化大字
+  if(G.state==='evolve'){
+    const nx=Math.min(P.stage+1,4);
+    drawBigCenter('进化 · '+STAGES[nx].name, STAGES[nx].line, clamp(G.evoT/1.9,0,1));
+  }
+  // 胜利大字：吞天完成
+  if(G.state==='victory' && G.winPhase>=1){
+    const k=clamp((G.winT-1.1)/1.2,0,1);
+    ctx.save(); ctx.translate(W/2,H*.45);
+    const sc=lerp(2.2,1,Math.min(1,k*2));
+    ctx.scale(sc,sc); ctx.globalAlpha=Math.min(1,k*3);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='900 72px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.shadowColor='#ff9a3c'; ctx.shadowBlur=40;
+    ctx.fillStyle='#fff'; ctx.fillText('吞天完成',0,0);
+    ctx.shadowBlur=0; ctx.restore(); ctx.globalAlpha=1;
+  }
+  // 倒计时
+  if(G.state==='count'){
+    const k=G.countT;
+    ctx.save(); ctx.translate(W/2,H*.42);
+    const sc=lerp(1.8,1,Math.min(1,k*3));
+    ctx.scale(sc,sc); ctx.globalAlpha=1-k*.6;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='900 110px "PingFang SC",sans-serif';
+    ctx.shadowColor='#7fd6ff'; ctx.shadowBlur=36;
+    ctx.fillStyle='#eaf6ff';
+    ctx.fillText(G.countNum>0?G.countNum:'吞!',0,0);
+    ctx.shadowBlur=0; ctx.restore(); ctx.globalAlpha=1;
+  }
+  // 全屏闪光
+  if(G.flash.a>0){ ctx.fillStyle=`rgba(${G.flash.color},${clamp(G.flash.a,0,1)})`; ctx.fillRect(0,0,W,H); }
+  // 暗角
+  if(vignette) ctx.drawImage(vignette,0,0);
+}
+
+/* ---------- 界面切换 ---------- */
+function showDead(){
+  $('dStage').textContent=STAGES[P.stage].name;
+  $('dEat').textContent=P.eat;
+  $('dTime').textContent=Math.floor(G.playT);
+  ui.dead.classList.remove('hide'); ui.hud.style.display='none';
+}
+function showWin(){
+  $('wEat').textContent=P.eat;
+  $('wTime').textContent=Math.floor(G.playT);
+  ui.win.classList.remove('hide'); ui.hud.style.display='none';
+}
+function startGame(){
+  audio();
+  ui.menu.classList.add('hide'); ui.dead.classList.add('hide'); ui.win.classList.add('hide');
+  ui.hud.style.display='block';
+  reset();
+  G.state='count'; G.countNum=3; G.countT=0;
+  tone(520,.15,'sine',.15);
+}
+$('btnStart').addEventListener('click',startGame);
+$('btnRetry').addEventListener('click',startGame);
+$('btnAgain').addEventListener('click',startGame);
+
+/* ---------- 主循环 ---------- */
+let last=performance.now();
+function loop(now){
+  let dt=(now-last)/1000; last=now;
+  dt=Math.min(dt,.05); // 防止切后台卡顿跳帧
+  G.t+=dt;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+initBG();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
